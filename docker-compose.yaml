@@ -1,0 +1,67 @@
+version: "3.9"
+services:
+    php:
+      build: .
+      user: www-data:www-data
+      restart: unless-stopped
+      depends_on:
+        - db
+      networks:
+        - my-network
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.php.rule=Host(`myapp.localhost`)"
+        - "traefik.http.routers.php.entrypoints=web"
+        - "traefik.http.services.php.loadbalancer.server.port=80"
+      volumes:
+      - ./app:/var/www/html
+    db:
+      image: mysql:5.7
+      restart: unless-stopped
+      ports:
+        - "3307:3306"
+      environment:
+        MYSQL_ROOT_PASSWORD: root
+        MYSQL_DATABASE: my_db
+      volumes:
+        - db_data:/var/lib/mysql
+      networks:
+        - my-network
+    phpmyadmin:
+      image: phpmyadmin:5.2
+      container_name: pma
+      links:
+        - db
+      environment:
+        PMA_HOST: db
+        PMA_PORT: 3306
+      restart: unless-stopped
+      # ports:
+      #   - 8081:80
+      networks:
+        - my-network
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.phpmyadmin.rule=Host(`phpmyadmin.localhost`)"
+        - "traefik.http.routers.phpmyadmin.entrypoints=web"
+        - "traefik.http.services.phpmyadmin.loadbalancer.server.port=80"
+    traefik:
+      image: "traefik:v2.10"
+      container_name: "traefik"
+      command:
+        # - "--log.level=DEBUG"
+        - "--api.insecure=true"
+        - "--providers.docker=true"
+        - "--providers.docker.exposedbydefault=false"
+        - "--entrypoints.web.address=:80"
+      ports:
+        - "80:80"
+        - "8080:8080"
+      networks:
+        - my-network
+      volumes:
+        - "/var/run/docker.sock:/var/run/docker.sock:ro"
+volumes:
+  db_data:
+networks:
+  my-network:
